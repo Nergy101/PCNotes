@@ -1,0 +1,320 @@
+﻿@page "/"
+@implements IDisposable
+@using PCNotes.Shared
+@using PCNotes.Client.Components 
+@using Toolbelt.Blazor.HotKeys
+@using Blazm.Bluetooth
+@inject IMatToaster Toaster
+@inject HotKeys HotKeys
+@inject BluetoothNavigator BluetoothNavigator
+@inject HttpClient Http
+
+<div class="mat-layout-grid">
+    <div class="mat-layout-grid-inner">
+        <div class="mat-layout-grid-cell mat-layout-grid-cell-span-1"></div>
+        <div class="mat-layout-grid-cell mat-layout-grid-cell-span-10">
+            <div class="mat-layout-grid-inner">
+                <div class="mat-layout-grid-cell mat-layout-grid-cell-span-12">
+                    <MatH1>Welcome to PCNotes <MatButton Icon="add" Raised="true" OnClick="@(() => { DialogNoteAddIsOpen = true; })">Add Note</MatButton></MatH1>
+                </div>
+                <div class="mat-layout-grid-cell mat-layout-grid-cell-span-12">
+                    <MatTextField @bind-Value="@CreatorName" Label="Who are you?" Icon="person" IconTrailing="true"></MatTextField>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(CreatorName))
+                {
+                    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-12">
+                        <MatTextField @bind-Value="@SearchTerm" Label="Search" Icon="@MatIconNames.Search" IconTrailing="false" FullWidth="true"></MatTextField>
+
+                        @if (Notes?.Count == 1)
+                        {
+                            var noteGroupsByWeek = Notes.OrderByDescending(n => n.CreationTime).GroupBy(n => new { n.CreationTime.Year, n.CreationTime.Month }).ToList();
+
+                            foreach (var noteGroup in noteGroupsByWeek)
+                            {
+                                var notes = noteGroup.ToList();
+                                <MatH6>@notes[0].CreationTime.ToString("yyyy-MM")</MatH6>
+                                <MatAccordion Multi="true">
+                                    @foreach (var note in notes)
+                                    {
+                                        <PCNote Note="@note" CreatorName="@CreatorName" OnDelete="@(note => RemoveNote(note))"></PCNote>
+                                    }
+                                </MatAccordion>
+
+                                @if (noteGroup != noteGroupsByWeek.Last())
+                                {
+                                    <div style="margin-top: 2em; margin-bottom: 1em;">
+                                        <MatDivider></MatDivider>
+                                    </div>
+                                }
+                            }
+                        }
+                        else if (Notes.Count > 1)
+                        {
+                            var noteGroupsByWeek = Notes.OrderByDescending(n => n.CreationTime).GroupBy(n => new { n.CreationTime.Year, n.CreationTime.Month }).ToList();
+
+                            foreach (var noteGroup in noteGroupsByWeek)
+                            {
+                                var notes = noteGroup.ToList();
+                                <MatH6>@notes[0].CreationTime.ToString("yyyy-MM")</MatH6>
+                                <MatAccordion Multi="true">
+                                    @foreach (var note in notes)
+                                    {
+                                        <PCNote Note="@note" CreatorName="@CreatorName" OnDelete="@(note => RemoveNote(note))"></PCNote>
+                                    }
+                                </MatAccordion>
+
+                                @if (noteGroup != noteGroupsByWeek.Last())
+                                {
+                                    <div style="margin-top: 2em; margin-bottom: 1em;">
+                                        <MatDivider></MatDivider>
+                                    </div>
+                                }
+                            }
+                        }
+                        else if (Notes == null)
+                        {
+                            <MatProgressBar Indeterminate="true"></MatProgressBar>
+                        }
+
+                    </div>
+                }
+            </div>
+        </div>
+        <div class="mat-layout-grid-cell mat-layout-grid-cell-span-1"></div>
+    </div>
+</div>
+
+@*Snackbar*@
+<MatSnackbar @bind-IsOpen="@SnackBarNoteDeleteIsOpen">
+    <MatSnackbarContent>You deleted a Note</MatSnackbarContent>
+    <MatSnackbarActions>
+        <MatButton Raised="true" OnClick="@(_ => UndoNoteDelete())">Undo</MatButton>
+    </MatSnackbarActions>
+</MatSnackbar>
+
+@*Dialog*@
+<MatDialog @bind-IsOpen="@DialogNoteAddIsOpen">
+    <MatDialogTitle>New Note by @CreatorName</MatDialogTitle>
+    <MatDialogContent>
+        <p>Create a new Note</p>
+        <p>
+            <MatTextField Icon="@MatIconNames.Note_add" @bind-Value="@NewNoteTitle" PlaceHolder="Omae Wa Mou..." FullWidth="true"></MatTextField>
+        </p>
+        <p>
+            <MatTextField @bind-Value="@NewNoteContent" PlaceHolder="Shindeiru!" TextArea="true" FullWidth="true"></MatTextField>
+        </p>
+    </MatDialogContent>
+    <MatDialogActions>
+        <MatButton OnClick="@(e => { DialogNoteAddIsOpen = false; NewNoteContent = ""; NewNoteTitle = ""; })">Take me back</MatButton>
+        <MatButton OnClick="@NewNoteClick">Post it</MatButton>
+    </MatDialogActions>
+</MatDialog>
+
+@code {
+    HotKeysContext HotKeysContext;
+    Device Device;
+
+    public List<Note> Notes { get; set; }
+    public Dictionary<Note, string> NewCheckListItemTexts { get; set; } = new Dictionary<Note, string>();
+
+    public List<Note> DeletedNotes { get; set; } = new List<Note>();
+
+    public string CreatorName { get; set; }
+
+    public string _searchTerm;
+    public string SearchTerm
+    {
+        get { return _searchTerm; }
+        set
+        {
+            Console.WriteLine($"changed searchterm from {_searchTerm} to {value}");
+            FilterNotes(value);
+            _searchTerm = value;
+        }
+    }
+    bool SnackBarNoteDeleteIsOpen = false;
+
+    bool DialogNoteAddIsOpen = false;
+    string NewNoteTitle = "";
+    string NewNoteContent = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        HotKeysContext = HotKeys.CreateContext()
+            .Add(ModKeys.Ctrl | ModKeys.Shift, Keys.N, OpenNoteDialog, "Add new Note")
+            .Add(ModKeys.Ctrl | ModKeys.Shift, Keys.Z, UndoNoteDelete);
+
+        var notes = await Http.GetFromJsonAsync<List<Note>>("api/notes");
+        notes.ForEach(n => NewCheckListItemTexts.Add(n, ""));
+        Notes = notes;
+
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        HotKeysContext.Dispose();
+    }
+
+    private async Task FilterNotes(string searchterm)
+    {
+        var notes = await Http.GetFromJsonAsync<List<Note>>($"api/notes/search?searchterm={searchterm}");
+        notes.ForEach(n => NewCheckListItemTexts.Add(n, ""));
+        Notes = notes;
+
+        if (Notes.Count == 1)
+        {
+
+        }
+
+        StateHasChanged();
+    }
+
+    private void OpenNoteDialog()
+    {
+        DialogNoteAddIsOpen = true;
+        StateHasChanged();
+    }
+
+    private void OnBluetoothNotification(object sender, CharacteristicEventArgs e)
+    {
+        var data = e.Value.ToArray();
+
+        // Do something with the data
+
+        StateHasChanged();
+    }
+
+    private void OnKeyDownHandler(KeyboardEventArgs e, Note note)
+    {
+        if (e.Code == "Enter" || e.Code == "NumpadEnter")
+        {
+            Console.WriteLine("OnKeyDownEnter");
+            AddCheckListItem(note);
+        }
+    }
+
+    private void OnInputHandler(ChangeEventArgs e, Note note)
+    {
+        Console.WriteLine("OnInput");
+        NewCheckListItemTexts[note] = (string)e.Value;
+    }
+
+    private void NewNoteClick()
+    {
+        AddNote();
+        DialogNoteAddIsOpen = false;
+        NewNoteContent = "";
+        NewNoteTitle = "";
+        StateHasChanged();
+    }
+
+    private void AddNote()
+    {
+        var newNote = new Note
+        {
+            Content = NewNoteContent,
+            Creator = CreatorName,
+            Title = NewNoteTitle,
+            CreationTime = DateTime.Now,
+            CheckList = null
+        };
+
+        NewCheckListItemTexts.Add(newNote, "");
+        Notes.Add(newNote);
+
+        Toaster.Add("Added note", MatToastType.Success, icon: MatIconNames.Note_add);
+        StateHasChanged();
+    }
+
+    private bool RemoveNote(Note note)
+    {
+        DeletedNotes = DeletedNotes.Append(note).ToList();
+        Notes.Remove(note);
+        SnackBarNoteDeleteIsOpen = true;
+        Toaster.Add("Deleted note", MatToastType.Danger, icon: MatIconNames.Delete);
+        StateHasChanged();
+        return true;
+    }
+
+    private void UndoNoteDelete()
+    {
+        var deletedNote = DeletedNotes.LastOrDefault();
+        if (deletedNote != null)
+        {
+            Notes.Add(deletedNote);
+            DeletedNotes.Remove(deletedNote);
+            Toaster.Add("Restored note", MatToastType.Info, icon: MatIconNames.Restore_from_trash);
+        }
+
+        StateHasChanged();
+    }
+
+    private void RemoveCheckListItem(Note note, CheckListItem item)
+    {
+        var noteToEdit = Notes[Notes.IndexOf(note)];
+        note.CheckList.Items.Remove(item);
+        StateHasChanged();
+    }
+
+    private void AddCheckListItem(Note note)
+    {
+        var noteIndex = Notes.IndexOf(note);
+
+        if (note.CheckList == null)
+        {
+            note.CheckList = new CheckList { Items = new List<CheckListItem>() };
+        }
+
+        note.CheckList.Items.Add(new CheckListItem
+        {
+            Checked = false,
+            Content = NewCheckListItemTexts[note],
+            Index = note.CheckList.Items.Count
+        });
+
+        NewCheckListItemTexts[note] = "";
+        StateHasChanged();
+    }
+
+    private async Task FilesReadyForContent(IMatFileUploadEntry[] files, Note note)
+    {
+        foreach (var file in files)
+        {
+            using (var stream = new System.IO.MemoryStream())
+            {
+                await file.WriteToStreamAsync(stream);
+
+                note.Attachments.Add(new Attachment
+                {
+                    UploadedBy = CreatorName,
+                    OriginalFileName = file.Name,
+                    ServerFileName = Guid.NewGuid(),
+                    FileContent = stream.ToArray()
+                });
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    private string FormatDayNumber(int day)
+    {
+        if (day == 1)
+        {
+            return day + "st";
+        }
+        else if (day == 2)
+        {
+            return day + "nd";
+        }
+        else if (day == 3)
+        {
+            return day + "rd";
+        }
+        else
+        {
+            return day + "th";
+        }
+    }
+}

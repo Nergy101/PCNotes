@@ -1,0 +1,171 @@
+﻿@using PCNotes.Shared
+
+<MatTooltip Tooltip="@((Note.CheckList?.CheckedItemCount ?? 0) + "/" + (Note.CheckList?.TotalItemCount ?? 0))" Position="@MatTooltipPosition.Left">
+    <MatExpansionPanel RefBack="@context">
+        <MatExpansionPanelSummary>
+            <MatExpansionPanelHeader>
+                <div>
+                    <span>@(FormatDayNumber(Note.CreationTime.Day)) - @Note.Title - @Note.Creator</span>
+                </div>
+            </MatExpansionPanelHeader>
+        </MatExpansionPanelSummary>
+        <MatExpansionPanelDetails>
+            <div class="mat-layout-grid">
+                <div class="mat-layout-grid-inner">
+                    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-10">
+                        <MatBody1>@Note.Content</MatBody1>
+                    </div>
+                    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-2">
+                        <MatButton Icon="remove" OnClick="@(_ => RemoveNote())">Remove Note</MatButton>
+                    </div>
+                    <div class="mat-layout-grid-inner">
+                        <div class="mat-layout-grid-cell mat-layout-grid-cell-span-12">
+                            <MatTextField @bind-Value="NewCheckListItemText"
+                                          OnInput="@(e => OnInputHandler(e))"
+                                          OnKeyDown="@(e => OnKeyDownHandler(e))"
+                                          Label="New item...">
+                                <MatIconButton Icon="add" OnClick="@(_ => AddCheckListItem())"></MatIconButton>
+                            </MatTextField>
+                        </div>
+                    </div>
+                    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-12">
+                        <MatList>
+                            @if (Note.CheckList?.Items?.Count > 0)
+                            {
+                                foreach (var item in Note.CheckList.Items.OrderBy(i => i.Index))
+                                {
+                                    <MatListItem>
+                                        <MatIconButton Icon="remove_circle" OnClick="@(_ => RemoveCheckListItem(item))"></MatIconButton>
+                                        <MatCheckbox @bind-Value="@item.Checked" Label="">@item.Content</MatCheckbox>
+                                    </MatListItem>
+                                    <MatListDivider></MatListDivider>
+                                }
+                            }
+                        </MatList>
+                    </div>
+                    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-10">
+                        <div class="mat-caption">
+                            @Note.NoteId - @(Note.CreationTime.ToString("dd-MM-yyyy" ) + " at " + Note.CreationTime.ToString("HH:mm:ss"))
+                        </div>
+                    </div>
+                    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-2">
+                        <MatIconButton @bind-Toggled="Note.Favorited" Icon="@MatIconNames.Favorite_border" ToggleIcon="@MatIconNames.Favorite"></MatIconButton>
+                        <MatIconButton Icon="@MatIconNames.Share"></MatIconButton>
+                    </div>
+                    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-12">
+                        <MatFileUpload AllowMultiple="false" OnChange="@(files => FilesReadyForContent(files))"></MatFileUpload>
+                    </div>
+
+                    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-12">
+                        <MatList>
+                            @foreach (var attachment in Note.Attachments)
+                            {
+                                <MatListItem>
+                                    @attachment.OriginalFileName, @(attachment.FileContent.Length/1024) kb, @attachment.ServerFileName
+                                </MatListItem>
+                            }
+                        </MatList>
+                    </div>
+                </div>
+            </div>
+        </MatExpansionPanelDetails>
+        <MatProgressBar Progress="@(Note.CheckList?.GetCheckListProgress() ?? 1)"></MatProgressBar>
+    </MatExpansionPanel>
+</MatTooltip>
+
+@code {
+
+    [Parameter]
+    public Note Note { get; set; }
+
+    [Parameter]
+    public string CreatorName { get; set; }
+
+    [Parameter]
+    public EventCallback<Note> OnDelete { get; set; }
+
+    string NewCheckListItemText { get; set; } = "";
+
+    private void RemoveNote() => OnDelete.InvokeAsync(Note);
+
+    private async Task FilesReadyForContent(IMatFileUploadEntry[] files)
+    {
+        foreach (var file in files)
+        {
+            using (var stream = new System.IO.MemoryStream())
+            {
+                await file.WriteToStreamAsync(stream);
+
+                Note.Attachments.Add(new Attachment
+                {
+                    UploadedBy = CreatorName,
+                    OriginalFileName = file.Name,
+                    ServerFileName = Guid.NewGuid(),
+                    FileContent = stream.ToArray()
+                });
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    private void RemoveCheckListItem(CheckListItem item)
+    {
+        Note.CheckList.Items.Remove(item);
+        StateHasChanged();
+    }
+
+    private void AddCheckListItem()
+    {
+        if (Note.CheckList == null)
+        {
+            Note.CheckList = new CheckList { Items = new List<CheckListItem>() };
+        }
+
+        Note.CheckList.Items.Add(new CheckListItem
+        {
+            Checked = false,
+            Content = NewCheckListItemText,
+            Index = Note.CheckList.Items.Count
+        });
+
+        NewCheckListItemText = "";
+        StateHasChanged();
+    }
+
+    private string FormatDayNumber(int day)
+    {
+        if (day == 1)
+        {
+            return day + "st";
+        }
+        else if (day == 2)
+        {
+            return day + "nd";
+        }
+        else if (day == 3)
+        {
+            return day + "rd";
+        }
+        else
+        {
+            return day + "th";
+        }
+    }
+
+    private void OnKeyDownHandler(KeyboardEventArgs e)
+    {
+        Console.WriteLine("Test1");
+        if (e.Code == "Enter" || e.Code == "NumpadEnter")
+        {
+            AddCheckListItem();
+        }
+    }
+
+    private void OnInputHandler(ChangeEventArgs e)
+    {
+        Console.WriteLine("Test2");
+        NewCheckListItemText = (string)e.Value;
+    }
+
+}

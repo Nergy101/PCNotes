@@ -1,0 +1,84 @@
+﻿@page "/Bluetooth"
+@using Blazm.Bluetooth
+@inject BluetoothNavigator BluetoothNavigator
+@inject HttpClient Http
+
+<div>
+    <h3>Device Information</h3>
+
+    <MatButton @onclick="ConnectBluetooth">Connect</MatButton>
+
+
+    @if (Device != null)
+    {
+        <MatH1>Connected with: @Device.Name (@Device.Id)</MatH1>
+        <MatButton @onclick="CallBluetooth">Call</MatButton>
+    }
+
+    <MatList>
+        @foreach (var msg in BluetoothMessages)
+        {
+            <MatListItem>
+                @msg
+            </MatListItem>
+            <MatListDivider></MatListDivider>
+        }
+    </MatList>
+</div>
+
+
+@code {
+    Device Device;
+    List<string> BluetoothMessages { get; set; } = new List<string>();
+
+    string service = "00000001-5f60-4c4f-9c83-a7953298d40d";
+    string character = "00000003-5f60-4c4f-9c83-a7953298d40d";
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        //ConnectBluetooth();
+    }
+
+    private async Task ConnectBluetooth()
+    {
+
+
+        var q = new RequestDeviceQuery();
+        q.AcceptAllDevices = true;
+        q.OptionalServices = new List<string> { service };
+
+        Device = await BluetoothNavigator.RequestDeviceAsync(q);
+
+        var bytes = await BluetoothNavigator.ReadValueAsync(Device.Id, service, character);
+
+        var data = System.Text.UnicodeEncoding.UTF8.GetString(bytes);
+        BluetoothMessages.Add(data);
+
+        StateHasChanged();
+        //await BluetoothNavigator.SetupNotifyAsync(Device.Id, service, "firmware_revision_string");
+        //BluetoothNavigator.Notification += OnBluetoothNotification;
+    }
+
+    private async Task CallBluetooth()
+    {
+        var bytes = await BluetoothNavigator.ReadValueAsync(Device.Id, service, character);
+
+        var data = System.Text.UnicodeEncoding.UTF8.GetString(bytes);
+        BluetoothMessages.Add(data);
+
+        StateHasChanged();
+    }
+
+    private void OnBluetoothNotification(object sender, CharacteristicEventArgs e)
+    {
+        var bytes = e.Value.ToArray();
+
+        var dataString = System.Text.UTF8Encoding.UTF8.GetString(bytes);
+
+        BluetoothMessages.Add(dataString);
+
+        StateHasChanged();
+    }
+
+} 

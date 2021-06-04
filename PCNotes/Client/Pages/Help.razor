@@ -1,0 +1,32 @@
+﻿@page "/help"
+@implements IDisposable
+@using PCNotes.Shared;
+@using Toolbelt.Blazor.HotKeys
+@inject HotKeys HotKeys
+@inject HttpClient Http;
+<h1>Keyboard shortcuts: </h1>
+
+<ul>
+    @foreach (var key in this.HotKeysContext.Keys)
+    {
+        <li>@key</li>
+    }
+</ul>
+
+
+
+@code {
+    HotKeysContext HotKeysContext;
+
+    protected override async Task OnInitializedAsync()
+    {
+        HotKeysContext = HotKeys.CreateContext()
+            .Add(ModKeys.Ctrl | ModKeys.Shift, Keys.N, () => { }, "Open new note dialog")
+            .Add(ModKeys.Ctrl | ModKeys.Shift, Keys.Z, () => { }, "Undo note delete");
+    }
+
+    public void Dispose()
+    {
+        HotKeysContext.Dispose();
+    }
+}
