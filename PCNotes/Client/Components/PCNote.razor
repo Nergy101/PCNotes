@@ -1,9 +1,14 @@
 ﻿@using PCNotes.Shared
+@using System.IO
+@inject IJSRuntime JSRuntime
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JS
 
 <MatTooltip Tooltip="@((Note.CheckList?.CheckedItemCount ?? 0) + "/" + (Note.CheckList?.TotalItemCount ?? 0))" Position="@MatTooltipPosition.Left">
     <MatExpansionPanel RefBack="@context">
         <MatExpansionPanelSummary>
-            <MatExpansionPanelHeader>
+            <MatExpansionPanelHeader Style="min-width: 100%;">
                 <div>
                     <span>@(FormatDayNumber(Note.CreationTime.Day)) - @Note.Title - @Note.Creator</span>
                 </div>
@@ -12,17 +17,36 @@
         <MatExpansionPanelDetails>
             <div class="mat-layout-grid">
                 <div class="mat-layout-grid-inner">
-                    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-10">
-                        <MatBody1>@Note.Content</MatBody1>
-                    </div>
-                    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-2">
-                        <MatButton Icon="remove" OnClick="@(_ => RemoveNote())">Remove Note</MatButton>
-                    </div>
-                    <div class="mat-layout-grid-inner">
+                    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-12" style="min-height: 20em;">
+                        <div class="mat-layout-grid-inner">
+                            <div class="mat-layout-grid-cell mat-layout-grid-cell-span-10">
+                                <MatOverline Style="@(Updating ? "color: var(--mdc-theme-secondary);" : "color: var(--mdc-theme-primary);")">
+                                    @(Updating ? "Saving..." : "Saved")
+                                </MatOverline>
+                            </div>
+                            <div class="mat-layout-grid-cell mat-layout-grid-cell-span-2">
+                                <MatButton Icon="remove" OnClick="@(_ => RemoveNote())">Remove Note</MatButton>
+                            </div>
+                        </div>
+
                         <div class="mat-layout-grid-cell mat-layout-grid-cell-span-12">
-                            <MatTextField @bind-Value="NewCheckListItemText"
+                            <MatTextField @bind-Value="NoteTitle"
+                                          Outlined="true"
+                                          Style="min-width: 100%;"/>
+
+                            <MatTextField @bind-Value="NoteContent"
+                                          OnKeyDown="@(e => TextAreaOnEnterKeyDownHandler(e))"
+                                          Style="min-height: 20em;"
+                                          TextArea="true"
+                                          FullWidth="true" />
+                        </div>
+                    </div>
+                    <div class="mat-layout-grid-inner" style="margin-top: 2em;">
+                        <div class="mat-layout-grid-cell mat-layout-grid-cell-span-12">
+                            <MatTextField Id="@($"checklistInput-{Note.NoteId}")"
+                                          @bind-Value="NewCheckListItemText"
                                           OnInput="@(e => OnInputHandler(e))"
-                                          OnKeyDown="@(e => OnKeyDownHandler(e))"
+                                          OnKeyDown="@(e => CheckListItemOnKeyDownHandler(e))"
                                           Label="New item...">
                                 <MatIconButton Icon="add" OnClick="@(_ => AddCheckListItem())"></MatIconButton>
                             </MatTextField>
@@ -36,7 +60,7 @@
                                 {
                                     <MatListItem>
                                         <MatIconButton Icon="remove_circle" OnClick="@(_ => RemoveCheckListItem(item))"></MatIconButton>
-                                        <MatCheckbox @bind-Value="@item.Checked" Label="">@item.Content</MatCheckbox>
+                                        <MatCheckbox @bind-Value="@item.Checked" Label="@OnCheckboxChanged()">@item.Content</MatCheckbox>
                                     </MatListItem>
                                     <MatListDivider></MatListDivider>
                                 }
@@ -53,18 +77,27 @@
                         <MatIconButton Icon="@MatIconNames.Share"></MatIconButton>
                     </div>
                     <div class="mat-layout-grid-cell mat-layout-grid-cell-span-12">
-                        <MatFileUpload AllowMultiple="false" OnChange="@(files => FilesReadyForContent(files))"></MatFileUpload>
-                    </div>
-
-                    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-12">
-                        <MatList>
-                            @foreach (var attachment in Note.Attachments)
-                            {
-                                <MatListItem>
-                                    @attachment.OriginalFileName, @(attachment.FileContent.Length/1024) kb, @attachment.ServerFileName
-                                </MatListItem>
-                            }
-                        </MatList>
+                        <MatFileUpload AllowMultiple="false" OnChange="@(FilesReadyForContent)"></MatFileUpload>
+                        @if (Note.Attachments.Any())
+                        {
+                            <div style="margin-top: 2em;">
+                                <MatTable Items="@Note.Attachments">
+                                    <MatTableHeader>
+                                        <th>Name</th>
+                                        <th>Uploader</th>
+                                        <th></th>
+                                    </MatTableHeader>
+                                    <MatTableRow Context="attachment">
+                                        <td>@attachment.OriginalFileName</td>
+                                        <td>@attachment.UploadedBy</td>
+                                        <td>
+                                            <MatIconButton Icon="@MatIconNames.Get_app" @onclick="() => DownloadAttachment(attachment)" />
+                                            <MatIconButton Icon="@MatIconNames.Delete" @onclick="() => DeleteAttachment(attachment)" />
+                                        </td>
+                                    </MatTableRow>
+                                </MatTable>
+                            </div>
+                        }
                     </div>
                 </div>
             </div>
@@ -74,7 +107,6 @@
 </MatTooltip>
 
 @code {
-
     [Parameter]
     public Note Note { get; set; }
 
@@ -84,7 +116,60 @@
     [Parameter]
     public EventCallback<Note> OnDelete { get; set; }
 
+    private bool Updating = false;
+
+    private string _noteTitle;
+    public string NoteTitle
+    {
+        get { return _noteTitle; }
+        set
+        {
+            _noteTitle = value;
+            Note.Title = value;
+
+            UpdateNote(Note);
+        }
+    }
+
+    private string _noteContent;
+    public string NoteContent
+    {
+        get { return _noteContent; }
+        set
+        {
+            _noteContent = value;
+            Note.Content = value;
+
+            UpdateNote(Note);
+        }
+    }
+
+    private int LastCheckedItemCount = 0;
+
     string NewCheckListItemText { get; set; } = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        NoteContent = Note.Content;
+        NoteTitle = Note.Title;
+        Updating = false;
+
+        LastCheckedItemCount = Note.CheckList.CheckedItemCount;
+    }
+
+    private void UpdateNote(Note note)
+    {
+        Task.Run(async () =>
+        {
+            Updating = true;
+            StateHasChanged();
+            await Http.PutAsJsonAsync("api/notes", Note);
+
+            await Task.Delay(500);
+            Updating = false;
+            StateHasChanged();
+        });
+    }
 
     private void RemoveNote() => OnDelete.InvokeAsync(Note);
 
@@ -92,30 +177,32 @@
     {
         foreach (var file in files)
         {
-            using (var stream = new System.IO.MemoryStream())
+            var stream = new MemoryStream();
+            await file.WriteToStreamAsync(stream);
+            var newAttachment = new Attachment
             {
-                await file.WriteToStreamAsync(stream);
+                UploadedBy = CreatorName,
+                OriginalFileName = file.Name,
+                ServerFileName = Guid.NewGuid(),
+                FileContent = stream.ToArray()
+            };
 
-                Note.Attachments.Add(new Attachment
-                {
-                    UploadedBy = CreatorName,
-                    OriginalFileName = file.Name,
-                    ServerFileName = Guid.NewGuid(),
-                    FileContent = stream.ToArray()
-                });
-            }
+            await Http.PostAsJsonAsync($"api/notes/{Note.NoteId}/attachments", newAttachment);
+
+            Note.Attachments.Add(newAttachment);
         }
 
         StateHasChanged();
     }
 
-    private void RemoveCheckListItem(CheckListItem item)
+    private async Task RemoveCheckListItem(CheckListItem item)
     {
         Note.CheckList.Items.Remove(item);
+        // update already called in OnCheckboxChanged
         StateHasChanged();
     }
 
-    private void AddCheckListItem()
+    private async Task AddCheckListItem()
     {
         if (Note.CheckList == null)
         {
@@ -128,6 +215,8 @@
             Content = NewCheckListItemText,
             Index = Note.CheckList.Items.Count
         });
+
+        UpdateNote(Note);
 
         NewCheckListItemText = "";
         StateHasChanged();
@@ -153,19 +242,48 @@
         }
     }
 
-    private void OnKeyDownHandler(KeyboardEventArgs e)
+    private void TextAreaOnEnterKeyDownHandler(KeyboardEventArgs e)
     {
-        Console.WriteLine("Test1");
+        if (e.CtrlKey && e.Code == "Enter")
+        {
+            JS.InvokeVoidAsync("focus", $"checklistInput-{Note.NoteId}");
+            UpdateNote(Note);
+        }
+    }
+
+    private void CheckListItemOnKeyDownHandler(KeyboardEventArgs e)
+    {
         if (e.Code == "Enter" || e.Code == "NumpadEnter")
         {
-            AddCheckListItem();
+            Task.Run(async () => await AddCheckListItem());
         }
     }
 
     private void OnInputHandler(ChangeEventArgs e)
     {
-        Console.WriteLine("Test2");
         NewCheckListItemText = (string)e.Value;
+    }
+
+    private async Task DownloadAttachment(Attachment attachment)
+    {
+        NavigationManager.NavigateTo($"api/notes/{Note.NoteId}/attachments/{attachment.ServerFileName}", true);
+    }
+
+    private async Task DeleteAttachment(Attachment attachment)
+    {
+        await Http.DeleteAsync($"api/notes/{Note.NoteId}/attachments/{attachment.ServerFileName}");
+        Note.Attachments.Remove(attachment);
+    }
+
+    private string OnCheckboxChanged()
+    {
+        if (Note.CheckList.CheckedItemCount != LastCheckedItemCount)
+        {
+            UpdateNote(Note);
+            LastCheckedItemCount = Note.CheckList.CheckedItemCount;
+        }
+
+        return "";
     }
 
 }

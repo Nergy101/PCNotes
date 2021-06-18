@@ -679,3 +679,6 @@ obj/
 *.tlog
 
 # End of https://www.toptal.com/developers/gitignore/api/csharp,visualstudio,visualstudiocode,aspnetcore,dotnetcore
+
+**/notes.json
+**/Uploads

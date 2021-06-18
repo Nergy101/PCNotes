@@ -1,8 +1,12 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using PCNotes.Services;
 using PCNotes.Shared;
 using System;
 using System.Collections.Generic;
+using System.IO;
+//using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace PCNotes.Server.Controllers
 {
@@ -10,61 +14,24 @@ namespace PCNotes.Server.Controllers
     [Route("api/[controller]")]
     public class NotesController
     {
-        public List<Note> Notes { get; set; }
-        public NotesController()
+        public static string UploadDir = Path.Combine(Directory.GetCurrentDirectory(), "Uploads\\");
+        public NoteService NoteService { get; set; }
+        public NotesController(NoteService noteService)
         {
-            Notes = new List<Note> {
-            new Note {
-                NoteId = new Guid("6798895e-ec91-475b-a465-00f2e6b79719"),
-                Content = "Een uur geen Avril, is een uur niet geleefd",
-                Creator = "Christian",
-                Title = "Feitje",
-                CreationTime = DateTime.Now.AddDays(-2),
-                CheckList = new CheckList {
-                    Items = new List<CheckListItem> {
-                        new CheckListItem { Index = 0, Content = "Avril Luisteren", Checked=true },
-                        new CheckListItem { Index = 1, Content = "Metal Luisteren", Checked=false }
-                    }
-                }
-            },
-             new Note
-             {
-                 Content = "Boodschap",
-                 Creator = "Noah",
-                 Title = "Test Title",
-                 CreationTime = DateTime.Now.AddDays(-1),
-                 CheckList = new CheckList { Items = new List<CheckListItem>() }
-             },
-              new Note
-              {
-                  Content = "6x sensor, 3x arduino, 1x brein",
-                  Creator = "Peter",
-                  Title = "Ding bouwen",
-                  CreationTime = DateTime.Now.AddMonths(-1).AddDays(-3),
-                  CheckList = new CheckList
-                  {
-                      Items = new List<CheckListItem> {
-                        new CheckListItem { Index = 0, Content = "6x sensor", Checked=true },
-                        new CheckListItem { Index = 1, Content = "3x arduino", Checked=false },
-                        new CheckListItem { Index = 2, Content = "1x brein", Checked=false },
-                        new CheckListItem { Index = 2, Content = "20x schroef", Checked=false }
-                    }
-                  }
-              }
-            };
+            NoteService = noteService;
         }
 
         [HttpGet]
         public IEnumerable<Note> GetAllNotes()
         {
-            return Notes;
+            return NoteService.GetNotes();
         }
 
         [HttpGet("{noteId}")]
         public Note GetNote(Guid noteId)
         {
 
-            return Notes.SingleOrDefault(n => n.NoteId == noteId);
+            return NoteService.GetNotes().SingleOrDefault(n => n.NoteId == noteId);
         }
 
         [HttpGet("search")]
@@ -72,39 +39,96 @@ namespace PCNotes.Server.Controllers
         {
             if (searchterm == null) { return GetAllNotes(); }
             searchterm = searchterm.ToLowerInvariant();
-            return Notes.Where(n =>
+            return NoteService.GetNotes().Where(n =>
                 n.Content.ToLowerInvariant().Contains(searchterm) ||
                 n.Title.ToLowerInvariant().Contains(searchterm) ||
                 n.Creator.ToLowerInvariant().Contains(searchterm) ||
                 n.NoteId.ToString().ToLowerInvariant().Contains(searchterm) ||
-                n.CreationTime.ToString("dd-MM-yyyy").Contains(searchterm)||
-                n.CheckList.Items.Any(i => i.Content.ToLowerInvariant().Contains(searchterm)) 
+                n.CreationTime.ToString("dd-MM-yyyy").Contains(searchterm) ||
+                n.CheckList.Items.Any(i => i.Content.ToLowerInvariant().Contains(searchterm))
             ).ToList();
         }
 
         [HttpPost]
         public Note AddNote([FromBody] Note note)
         {
-            Notes.Add(note);
+            NoteService.AddNote(note);
             return note;
         }
 
         [HttpDelete]
         public bool DeleteNote(Guid noteId)
         {
-            return Notes.Remove(Notes.SingleOrDefault(n => n.NoteId == noteId));
+            try
+            {
+                NoteService.DeleteNote(noteId);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         [HttpPut]
         public Note UpdateNote([FromBody] Note updateNote)
         {
-            var noteToUpdate = Notes.Single(n => n.NoteId == updateNote.NoteId);
-            var indexOfNoteToUpdate = Notes.IndexOf(noteToUpdate);
+            return NoteService.UpdateNote(updateNote);
+        }
 
-            Notes.Remove(noteToUpdate);
-            Notes.Insert(indexOfNoteToUpdate, updateNote);
+        [HttpPost("{noteId}/attachments")]
+        public async Task<ActionResult> AddAttachment([FromRoute] Guid noteId, [FromBody] Attachment attachment)
+        {
+            var filePath = GetUploadPath(attachment.ServerFullName);
 
-            return updateNote;
+            using (var stream = File.Create(filePath))
+            {
+                using var ms = new MemoryStream(attachment.FileContent);
+                await ms.CopyToAsync(stream).ConfigureAwait(false);
+            }
+
+            NoteService.AddAttachment(noteId, attachment);
+            return new OkResult();
+        }
+
+        [HttpDelete("{noteId}/attachments/{serverFileName}")]
+        public async Task<ActionResult> DeleteAttachment(Guid noteId, Guid serverFileName)
+        {
+            var note = NoteService.GetNoteById(noteId);
+            var attachment = note.Attachments.Single(a => a.ServerFileName == serverFileName);
+
+            NoteService.DeleteAttachment(noteId, serverFileName);
+
+            var filePath = GetUploadPath(attachment.ServerFullName);
+            File.Delete(filePath);
+
+            return new OkResult();
+        }
+
+        [HttpGet("{noteId}/attachments/{serverFileName}"), DisableRequestSizeLimit]
+        public async Task<ActionResult> Download(Guid noteId, Guid serverFileName)
+        {
+            var note = NoteService.GetNoteById(noteId);
+            var attachment = note.Attachments.Single(a => a.ServerFileName == serverFileName);
+
+            var fileName = attachment.OriginalFileName;
+            string mimeType = MimeMapping.MimeUtility.GetMimeMapping(fileName);
+            var filePath = GetUploadPath(attachment.ServerFullName);
+
+            byte[] bytes = File.ReadAllBytes(filePath);
+
+            var ms = new MemoryStream(bytes);
+
+            return new FileStreamResult(ms, mimeType)
+            {
+                FileDownloadName = fileName
+            };
+        }
+
+        private static string GetUploadPath(string attachmentServerFullName)
+        {
+            Directory.CreateDirectory(UploadDir);
+            return Path.Combine(UploadDir, attachmentServerFullName);
         }
     }
 }

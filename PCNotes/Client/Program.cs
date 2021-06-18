@@ -1,9 +1,11 @@
 using Blazm.Bluetooth;
+using Blazored.LocalStorage;
 using MatBlazor;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Net.Http;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Toolbelt.Blazor.Extensions.DependencyInjection;
 
@@ -27,6 +29,17 @@ namespace PCNotes.Client
                 config.ShowCloseButton = true;
                 config.MaximumOpacity = 100;
                 config.VisibleStateDuration = 3000;
+            });
+
+            builder.Services.AddBlazoredLocalStorage(config =>
+            {
+                config.JsonSerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.CamelCase;
+                config.JsonSerializerOptions.IgnoreNullValues = false;
+                config.JsonSerializerOptions.IgnoreReadOnlyProperties = false;
+                config.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+                config.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+                config.JsonSerializerOptions.ReadCommentHandling = JsonCommentHandling.Skip;
+                config.JsonSerializerOptions.WriteIndented = true;
             });
 
             builder.Services.AddHotKeys();

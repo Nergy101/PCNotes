@@ -6,10 +6,12 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="5.0.6" />
+    <PackageReference Include="MimeMapping" Version="1.0.1.37" />
     <PackageReference Include="Toolbelt.Blazor.HotKeys" Version="10.0.1" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\PCNotes.Services\PCNotes.Services.csproj" />
     <ProjectReference Include="..\Client\PCNotes.Client.csproj" />
     <ProjectReference Include="..\Shared\PCNotes.Shared.csproj" />
   </ItemGroup>
