@@ -7,6 +7,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using PCNotes.Services;
 using System.Linq;
+using Microsoft.AspNetCore.HttpOverrides;
+using System.Net;
 
 namespace PCNotes.Server
 {
@@ -27,12 +29,22 @@ namespace PCNotes.Server
             services.AddSingleton<NoteService>();
 
             services.AddControllersWithViews();
+
+            services.Configure<ForwardedHeadersOptions>(options =>
+            {
+                //options.KnownProxies.Add(IPAddress.Parse("64.225.65.151"));
+                options.KnownProxies.Add(IPAddress.Parse("127.0.10.1"));
+                options.ForwardedHeaders =
+                    ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+            });
             services.AddRazorPages();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
+            app.UseForwardedHeaders();
+
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
