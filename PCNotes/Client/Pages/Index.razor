@@ -233,12 +233,15 @@
         StateHasChanged();
     }
 
-    private bool RemoveNote(Note note)
+    private async Task<bool> RemoveNote(Note note)
     {
         DeletedNotes = DeletedNotes.Append(note).ToList();
         Notes.Remove(note);
         SnackBarNoteDeleteIsOpen = true;
         Toaster.Add("Deleted note", MatToastType.Danger, icon: MatIconNames.Delete);
+
+        await Http.DeleteAsync("api/notes?noteId="+note.NoteId);
+
         StateHasChanged();
         return true;
     }

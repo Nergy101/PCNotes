@@ -42,7 +42,7 @@ namespace PCNotes.Services
 
         public void DeleteNote(Guid noteId)
         {
-            Notes.DeleteOne(note => note.NoteId == noteId);
+            Notes.DeleteOne(n => n.NoteId == noteId);
         }
 
         public void AddAttachment(Guid noteId, Attachment attachment)
