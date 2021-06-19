@@ -16,5 +16,9 @@
     <ProjectReference Include="..\Shared\PCNotes.Shared.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Uploads\" />
+  </ItemGroup>
+
 
 </Project>

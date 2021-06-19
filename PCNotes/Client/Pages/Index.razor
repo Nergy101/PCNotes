@@ -246,14 +246,17 @@
         return true;
     }
 
-    private void UndoNoteDelete()
+    private async Task UndoNoteDelete()
     {
-        var deletedNote = DeletedNotes.LastOrDefault();
-        if (deletedNote != null)
+        var restoredNote = DeletedNotes.LastOrDefault();
+
+        if (restoredNote != null)
         {
-            Notes.Add(deletedNote);
-            DeletedNotes.Remove(deletedNote);
+            Notes.Add(restoredNote);
+            DeletedNotes.Remove(restoredNote);
             Toaster.Add("Restored note", MatToastType.Info, icon: MatIconNames.Restore_from_trash);
+
+            await Http.PostAsJsonAsync("api/notes", restoredNote);
         }
 
         StateHasChanged();

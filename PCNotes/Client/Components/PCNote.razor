@@ -177,8 +177,9 @@
     {
         foreach (var file in files)
         {
-            var stream = new MemoryStream();
+            using var stream = new MemoryStream();
             await file.WriteToStreamAsync(stream);
+
             var newAttachment = new Attachment
             {
                 UploadedBy = CreatorName,
@@ -187,11 +188,9 @@
                 FileContent = stream.ToArray()
             };
 
-            await Http.PostAsJsonAsync($"api/notes/{Note.NoteId}/attachments", newAttachment);
-
             Note.Attachments.Add(newAttachment);
+            await Http.PostAsJsonAsync($"api/notes/{Note.NoteId}/attachments", newAttachment);
         }
-
         StateHasChanged();
     }
 
