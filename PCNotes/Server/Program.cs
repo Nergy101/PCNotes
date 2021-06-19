@@ -20,7 +20,7 @@ namespace PCNotes.Server
             Host.CreateDefaultBuilder(args)
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
-                    webBuilder.UseStartup<Startup>();
+                    webBuilder.UseStartup<Startup>().UseUrls(new[] { "http://0.0.0.0:5001" });
                 });
     }
 }
