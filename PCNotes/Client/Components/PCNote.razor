@@ -29,28 +29,25 @@
                             </div>
                         </div>
 
-                        <div class="mat-layout-grid-cell mat-layout-grid-cell-span-12">
-                            <MatTextField @bind-Value="NoteTitle"
-                                          Outlined="true"
-                                          Style="min-width: 100%;"/>
+                        <MatTextField @bind-Value="NoteTitle"
+                                      FullWidth="true" 
+                                      Label="Title"/>
 
-                            <MatTextField @bind-Value="NoteContent"
-                                          OnKeyDown="@(e => TextAreaOnEnterKeyDownHandler(e))"
-                                          Style="min-height: 20em;"
-                                          TextArea="true"
-                                          FullWidth="true" />
-                        </div>
+                        <MatTextField @bind-Value="NoteContent"
+                                      OnKeyDown="@(e => TextAreaOnEnterKeyDownHandler(e))"
+                                      Style="min-height: 20em;"
+                                      TextArea="true"
+                                      FullWidth="true" />
                     </div>
-                    <div class="mat-layout-grid-inner" style="margin-top: 2em;">
-                        <div class="mat-layout-grid-cell mat-layout-grid-cell-span-12">
-                            <MatTextField Id="@($"checklistInput-{Note.NoteId}")"
-                                          @bind-Value="NewCheckListItemText"
-                                          OnInput="@(e => OnInputHandler(e))"
-                                          OnKeyDown="@(e => CheckListItemOnKeyDownHandler(e))"
-                                          Label="New item...">
-                                <MatIconButton Icon="add" OnClick="@(_ => AddCheckListItem())"></MatIconButton>
-                            </MatTextField>
-                        </div>
+                    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-12">
+                        <MatTextField @bind-Value="NewCheckListItemText"
+                                      Id="@($"checklistInput-{Note.NoteId}")"
+                                      OnInput="@(e => OnInputHandler(e))"
+                                      OnKeyDown="@(e => CheckListItemOnKeyDownHandler(e))"
+                                      FullWidth="true"
+                                      Label="Checklist item">
+                        </MatTextField>
+                        @*<MatIconButton Icon="add" OnClick="@(_ => AddCheckListItem())"></MatIconButton>*@
                     </div>
                     <div class="mat-layout-grid-cell mat-layout-grid-cell-span-12">
                         <MatList>
