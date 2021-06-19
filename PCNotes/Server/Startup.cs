@@ -32,8 +32,7 @@ namespace PCNotes.Server
 
             services.Configure<ForwardedHeadersOptions>(options =>
             {
-                //options.KnownProxies.Add(IPAddress.Parse("64.225.65.151"));
-                options.KnownProxies.Add(IPAddress.Parse("127.0.10.1"));
+                options.KnownProxies.Add(IPAddress.Parse("64.225.65.151"));
                 options.ForwardedHeaders =
                     ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
             });
