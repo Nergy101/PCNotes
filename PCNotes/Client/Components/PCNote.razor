@@ -84,11 +84,20 @@
                                 <MatTable Items="@Note.Attachments">
                                     <MatTableHeader>
                                         <th>Name</th>
+                                        <th></th>
                                         <th>Uploader</th>
                                         <th></th>
                                     </MatTableHeader>
                                     <MatTableRow Context="attachment">
-                                        <td>@attachment.OriginalFileName</td>
+                                        <td>
+                                            @attachment.OriginalFileName
+                                        </td>
+                                        <td>
+                                            @if (new string[] { ".jpg", ".jpeg", ".png" }.Contains(Path.GetExtension(attachment.OriginalFileName)))
+                                                {
+                                                <img src="/api/notes/@Note.NoteId/attachments/@attachment.ServerFileName" style="width: 124px; height: 124px;" />
+                                                }
+                                        </td>
                                         <td>@attachment.UploadedBy</td>
                                         <td>
                                             <MatIconButton Icon="@MatIconNames.Get_app" @onclick="() => DownloadAttachment(attachment)" />

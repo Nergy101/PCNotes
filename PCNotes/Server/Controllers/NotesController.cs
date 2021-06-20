@@ -14,7 +14,7 @@ namespace PCNotes.Server.Controllers
     [Route("api/[controller]")]
     public class NotesController
     {
-        public static string UploadDir = Path.Combine(Directory.GetCurrentDirectory(), "Uploads\\");
+        public static string UploadDir = "Uploads";
 
         public INoteService NoteService { get; set; }
 
