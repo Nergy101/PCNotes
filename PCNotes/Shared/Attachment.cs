@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MongoDB.Bson.Serialization.Attributes;
+using System;
 using System.IO;
 
 namespace PCNotes.Shared
@@ -10,6 +11,8 @@ namespace PCNotes.Shared
 
         public string ServerFileFolder { get; set; }
         public string UploadedBy { get; set; }
+
+        [BsonIgnore]
         public byte[] FileContent { get; set; }
 
         public string ServerFullName => ServerFileName + "---" + OriginalFileName;

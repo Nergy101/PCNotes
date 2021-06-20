@@ -1,5 +1,4 @@
-﻿@page "/"
-@implements IDisposable
+﻿@page "/favorited"
 @using PCNotes.Shared
 @using PCNotes.Client.Components
 @using Toolbelt.Blazor.HotKeys
@@ -16,15 +15,12 @@
         <div class="mat-layout-grid-cell mat-layout-grid-cell-span-10">
             <div class="mat-layout-grid-inner">
                 <div class="mat-layout-grid-cell mat-layout-grid-cell-span-12">
-                    <MatH1>PCNotes</MatH1>
+                    <MatH1>Favorited</MatH1>
                 </div>
                 <div class="mat-layout-grid-cell mat-layout-grid-cell-span-12">
                     <MatTextField @bind-Value="@CreatorName" FullWidth="true" Label="Who are you?" Icon="person" IconTrailing="false"></MatTextField>
                 </div>
 
-                <div class="mat-layout-grid-cell mat-layout-grid-cell-span-10">
-                    <MatButton Icon="add" Raised="true" OnClick="@(() => { DialogNoteAddIsOpen = true; })">Add Note</MatButton>
-                </div>
                 @if (!string.IsNullOrWhiteSpace(CreatorName))
                 {
                     <div class="mat-layout-grid-cell mat-layout-grid-cell-span-12">
@@ -41,7 +37,7 @@
                                 <MatAccordion Multi="true">
                                     @foreach (var note in notes)
                                     {
-                                        <PCNote Note="@note" CreatorName="@CreatorName" OnDelete="@(note => RemoveNote(note))"></PCNote>
+                                        <PCNote Note="@note" CreatorName="@CreatorName" OnDelete="() => { }" DeletionEnabled="false"></PCNote>
                                     }
                                 </MatAccordion>
 
@@ -64,7 +60,7 @@
                                 <MatAccordion Multi="true">
                                     @foreach (var note in notes)
                                     {
-                                        <PCNote Note="@note" CreatorName="@CreatorName" OnDelete="@(note => RemoveNote(note))"></PCNote>
+                                        <PCNote Note="@note" CreatorName="@CreatorName" OnDelete="() => { }" DeletionEnabled="false"></PCNote>
                                     }
                                 </MatAccordion>
 
@@ -89,40 +85,20 @@
     </div>
 </div>
 
-@*Snackbar*@
-<MatSnackbar @bind-IsOpen="@SnackBarNoteDeleteIsOpen">
-    <MatSnackbarContent>You deleted a Note</MatSnackbarContent>
-    <MatSnackbarActions>
-        <MatButton Raised="true" OnClick="@(_ => UndoNoteDelete())">Undo</MatButton>
-    </MatSnackbarActions>
-</MatSnackbar>
-
-@*Dialog*@
-<MatDialog @bind-IsOpen="@DialogNoteAddIsOpen">
-    <MatDialogTitle>New Note by @CreatorName</MatDialogTitle>
-    <MatDialogContent>
-        <p>Create a new Note</p>
-        <p>
-            <MatTextField Icon="@MatIconNames.Note_add" @bind-Value="@NewNoteTitle" PlaceHolder="Omae Wa Mou..." FullWidth="true"></MatTextField>
-        </p>
-        <p>
-            <MatTextField @bind-Value="@NewNoteContent" PlaceHolder="Shindeiru!" TextArea="true" FullWidth="true"></MatTextField>
-        </p>
-    </MatDialogContent>
-    <MatDialogActions>
-        <MatButton OnClick="@(e => { DialogNoteAddIsOpen = false; NewNoteContent = ""; NewNoteTitle = ""; })">Take me back</MatButton>
-        <MatButton OnClick="@NewNoteClick">Post it</MatButton>
-    </MatDialogActions>
-</MatDialog>
-
 @code {
-    HotKeysContext HotKeysContext;
-    Device Device;
-
     public List<Note> Notes { get; set; }
     public Dictionary<Note, string> NewCheckListItemTexts { get; set; } = new Dictionary<Note, string>();
 
-    public List<Note> DeletedNotes { get; set; } = new List<Note>();
+    public string _searchTerm;
+    public string SearchTerm
+    {
+        get { return _searchTerm; }
+        set
+        {
+            FilterNotes(value);
+            _searchTerm = value;
+        }
+    }
 
     private string _creatorName;
 
@@ -136,23 +112,6 @@
         {
             localStorage.SetItemAsString("name", value);
             _creatorName = value;
-        }
-    }
-
-    bool SnackBarNoteDeleteIsOpen = false;
-    bool DialogNoteAddIsOpen = false;
-
-    string NewNoteTitle = "";
-    string NewNoteContent = "";
-
-    public string _searchTerm;
-    public string SearchTerm
-    {
-        get { return _searchTerm; }
-        set
-        {
-            FilterNotes(value);
-            _searchTerm = value;
         }
     }
 
@@ -174,20 +133,12 @@
 
     protected override async Task OnInitializedAsync()
     {
-        HotKeysContext = HotKeys.CreateContext()
-        .Add(ModKeys.Ctrl | ModKeys.Shift, Keys.N, OpenNoteDialog, "Add new Note")
-        .Add(ModKeys.Ctrl | ModKeys.Shift, Keys.Z, UndoNoteDelete);
-
         var notes = await Http.GetFromJsonAsync<List<Note>>("api/notes");
+        notes = notes.Where(n => n.Favorited).ToList();
         notes.ForEach(n => NewCheckListItemTexts.Add(n, ""));
         Notes = notes;
 
         StateHasChanged();
-    }
-
-    public void Dispose()
-    {
-        HotKeysContext.Dispose();
     }
 
     private async Task FilterNotes(string searchterm)
@@ -195,70 +146,6 @@
         var notes = await Http.GetFromJsonAsync<List<Note>>($"api/notes/search?searchterm={searchterm}");
         notes.ForEach(n => NewCheckListItemTexts.Add(n, ""));
         Notes = notes;
-        StateHasChanged();
-    }
-
-    private void OpenNoteDialog()
-    {
-        DialogNoteAddIsOpen = true;
-        StateHasChanged();
-    }
-
-    private void NewNoteClick()
-    {
-        AddNote();
-        DialogNoteAddIsOpen = false;
-        NewNoteContent = "";
-        NewNoteTitle = "";
-        StateHasChanged();
-    }
-
-    private async Task AddNote()
-    {
-        var newNote = new Note
-        {
-            Content = NewNoteContent,
-            Creator = CreatorName,
-            Title = NewNoteTitle,
-            CreationTime = DateTime.Now,
-            CheckList = new CheckList { Items = new List<CheckListItem>() }
-        };
-
-        NewCheckListItemTexts.Add(newNote, "");
-        Notes.Add(newNote);
-
-        await Http.PostAsJsonAsync("api/notes", newNote);
-
-        Toaster.Add("Added note", MatToastType.Success, icon: MatIconNames.Note_add);
-        StateHasChanged();
-    }
-
-    private async Task<bool> RemoveNote(Note note)
-    {
-        DeletedNotes = DeletedNotes.Append(note).ToList();
-        Notes.Remove(note);
-        SnackBarNoteDeleteIsOpen = true;
-        Toaster.Add("Deleted note", MatToastType.Danger, icon: MatIconNames.Delete);
-
-        await Http.DeleteAsync("api/notes?noteId="+note.NoteId);
-
-        StateHasChanged();
-        return true;
-    }
-
-    private async Task UndoNoteDelete()
-    {
-        var restoredNote = DeletedNotes.LastOrDefault();
-
-        if (restoredNote != null)
-        {
-            Notes.Add(restoredNote);
-            DeletedNotes.Remove(restoredNote);
-            Toaster.Add("Restored note", MatToastType.Info, icon: MatIconNames.Restore_from_trash);
-
-            await Http.PostAsJsonAsync("api/notes", restoredNote);
-        }
-
         StateHasChanged();
     }
 }

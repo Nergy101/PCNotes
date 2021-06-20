@@ -6,12 +6,12 @@ using System.Linq;
 
 namespace PCNotes.Services
 {
-    public class NoteService : IDisposable
+    public class FlatNoteService : INoteService, IDisposable
     {
         private DataStore DataStore;
         private IDocumentCollection<Note> Notes;
 
-        public NoteService()
+        public FlatNoteService()
         {
             DataStore = new DataStore("notes.json");
             Notes = DataStore.GetCollection<Note>();
@@ -22,9 +22,10 @@ namespace PCNotes.Services
             return Notes.AsQueryable().ToList();
         }
 
-        public void AddNote(Note note)
+        public Note AddNote(Note note)
         {
             Notes.InsertOne(note);
+            return note;
         }
 
         public Note GetNoteById(Guid noteId)
@@ -40,21 +41,23 @@ namespace PCNotes.Services
             return updateNote;
         }
 
-        public void DeleteNote(Guid noteId)
+        public bool DeleteNote(Guid noteId)
         {
             Notes.DeleteOne(n => n.NoteId == noteId);
+            return true;
         }
 
-        public void AddAttachment(Guid noteId, Attachment attachment)
+        public Attachment AddAttachment(Guid noteId, Attachment attachment)
         {
             var note = GetNoteById(noteId);
 
             note.Attachments.Add(attachment);
 
             UpdateNote(note);
+            return attachment;
         }
 
-        public void DeleteAttachment(Guid noteId, Guid serverFileName)
+        public bool DeleteAttachment(Guid noteId, Guid serverFileName)
         {
             var note = GetNoteById(noteId);
             var attachment = note.Attachments.Single(a => a.ServerFileName == serverFileName);
@@ -62,6 +65,7 @@ namespace PCNotes.Services
             note.Attachments.Remove(attachment);
 
             UpdateNote(note);
+            return true;
         }
 
         public void Dispose()

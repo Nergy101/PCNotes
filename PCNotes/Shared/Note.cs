@@ -1,8 +1,10 @@
-﻿using System;
+﻿using MongoDB.Bson.Serialization.Attributes;
+using System;
 using System.Collections.Generic;
 
 namespace PCNotes.Shared
 {
+    [BsonIgnoreExtraElements]
     public class Note
     {
         public Guid NoteId { get; set; } = Guid.NewGuid();

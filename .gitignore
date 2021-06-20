@@ -682,3 +682,5 @@ obj/
 
 **/notes.json
 **/Uploads
+**/appsettings.json
+**/appsettings.Development.json

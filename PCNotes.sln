@@ -9,7 +9,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PCNotes.Client", "PCNotes\C
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PCNotes.Shared", "PCNotes\Shared\PCNotes.Shared.csproj", "{26987F58-6A6D-417A-9E6B-09CB4F19F9E6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PCNotes.Services", "PCNotes.Services\PCNotes.Services.csproj", "{EBBF30D9-36B7-4DCB-B36B-D9E7497516FB}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PCNotes.Services", "PCNotes.Services\PCNotes.Services.csproj", "{EBBF30D9-36B7-4DCB-B36B-D9E7497516FB}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

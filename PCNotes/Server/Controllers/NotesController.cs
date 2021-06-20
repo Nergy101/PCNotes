@@ -15,8 +15,10 @@ namespace PCNotes.Server.Controllers
     public class NotesController
     {
         public static string UploadDir = Path.Combine(Directory.GetCurrentDirectory(), "Uploads\\");
-        public NoteService NoteService { get; set; }
-        public NotesController(NoteService noteService)
+
+        public INoteService NoteService { get; set; }
+
+        public NotesController(INoteService noteService)
         {
             NoteService = noteService;
         }

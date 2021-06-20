@@ -24,14 +24,17 @@
                                     @(Updating ? "Saving..." : "Saved")
                                 </MatOverline>
                             </div>
-                            <div class="mat-layout-grid-cell mat-layout-grid-cell-span-2">
-                                <MatButton Icon="remove" OnClick="@(_ => RemoveNote())">Remove Note</MatButton>
-                            </div>
+                            @if (DeletionEnabled)
+                            {
+                                <div class="mat-layout-grid-cell mat-layout-grid-cell-span-2">
+                                    <MatButton Icon="remove" OnClick="@(_ => RemoveNote())">Remove Note</MatButton>
+                                </div>
+                            }
                         </div>
 
                         <MatTextField @bind-Value="NoteTitle"
-                                      FullWidth="true" 
-                                      Label="Title"/>
+                                      FullWidth="true"
+                                      Label="Title" />
 
                         <MatTextField @bind-Value="NoteContent"
                                       OnKeyDown="@(e => TextAreaOnEnterKeyDownHandler(e))"
@@ -46,8 +49,8 @@
                                       OnKeyDown="@(e => CheckListItemOnKeyDownHandler(e))"
                                       FullWidth="true"
                                       Label="Checklist item">
+                            <MatIconButton Icon="add" OnClick="@(_ => AddCheckListItem())"></MatIconButton>
                         </MatTextField>
-                        @*<MatIconButton Icon="add" OnClick="@(_ => AddCheckListItem())"></MatIconButton>*@
                     </div>
                     <div class="mat-layout-grid-cell mat-layout-grid-cell-span-12">
                         <MatList>
@@ -70,7 +73,7 @@
                         </div>
                     </div>
                     <div class="mat-layout-grid-cell mat-layout-grid-cell-span-2">
-                        <MatIconButton @bind-Toggled="Note.Favorited" Icon="@MatIconNames.Favorite_border" ToggleIcon="@MatIconNames.Favorite"></MatIconButton>
+                        <MatIconButton @bind-Toggled="NoteFavorited" Icon="@MatIconNames.Favorite_border" ToggleIcon="@MatIconNames.Favorite"></MatIconButton>
                         <MatIconButton Icon="@MatIconNames.Share"></MatIconButton>
                     </div>
                     <div class="mat-layout-grid-cell mat-layout-grid-cell-span-12">
@@ -111,6 +114,9 @@
     public string CreatorName { get; set; }
 
     [Parameter]
+    public bool DeletionEnabled { get; set; } = true;
+
+    [Parameter]
     public EventCallback<Note> OnDelete { get; set; }
 
     private bool Updating = false;
@@ -124,7 +130,7 @@
             _noteTitle = value;
             Note.Title = value;
 
-            UpdateNote(Note);
+            UpdateNote();
         }
     }
 
@@ -137,7 +143,19 @@
             _noteContent = value;
             Note.Content = value;
 
-            UpdateNote(Note);
+            UpdateNote();
+        }
+    }
+
+    private bool _noteFavorited;
+    public bool NoteFavorited
+    {
+        get { return _noteFavorited; }
+        set
+        {
+            _noteFavorited = value;
+            Note.Favorited = value;
+            UpdateNote();
         }
     }
 
@@ -149,12 +167,14 @@
     {
         NoteContent = Note.Content;
         NoteTitle = Note.Title;
+        NoteFavorited = Note.Favorited;
+
         Updating = false;
 
         LastCheckedItemCount = Note.CheckList.CheckedItemCount;
     }
 
-    private void UpdateNote(Note note)
+    private void UpdateNote()
     {
         Task.Run(async () =>
         {
@@ -212,7 +232,7 @@
             Index = Note.CheckList.Items.Count
         });
 
-        UpdateNote(Note);
+        UpdateNote();
 
         NewCheckListItemText = "";
         StateHasChanged();
@@ -243,7 +263,7 @@
         if (e.CtrlKey && e.Code == "Enter")
         {
             JS.InvokeVoidAsync("focus", $"checklistInput-{Note.NoteId}");
-            UpdateNote(Note);
+            UpdateNote();
         }
     }
 
@@ -275,7 +295,7 @@
     {
         if (Note.CheckList.CheckedItemCount != LastCheckedItemCount)
         {
-            UpdateNote(Note);
+            UpdateNote();
             LastCheckedItemCount = Note.CheckList.CheckedItemCount;
         }
 
