@@ -10,7 +10,7 @@
         <MatExpansionPanelSummary>
             <MatExpansionPanelHeader Style="min-width: 100%;">
                 <div>
-                    <span>@(FormatDayNumber(Note.CreationTime.Day)) - @Note.Title - @Note.Creator</span>
+                    <span>@(Note.CreationTime.ToString("yyyy-MM-dd")) - @Note.Title - @Note.Creator</span>
                 </div>
             </MatExpansionPanelHeader>
         </MatExpansionPanelSummary>
@@ -69,7 +69,7 @@
                     </div>
                     <div class="mat-layout-grid-cell mat-layout-grid-cell-span-10">
                         <div class="mat-caption">
-                            @Note.NoteId - @(Note.CreationTime.ToString("dd-MM-yyyy" ) + " at " + Note.CreationTime.ToString("HH:mm:ss"))
+                            @Note.NoteId - @(Note.CreationTime.ToString("yyyy-MM-dd" ) + " at " + Note.CreationTime.ToString("HH:mm:ss"))
                         </div>
                     </div>
                     <div class="mat-layout-grid-cell mat-layout-grid-cell-span-2">
