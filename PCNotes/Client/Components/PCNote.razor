@@ -1,5 +1,5 @@
 ﻿@using PCNotes.Shared
-@using System.IO
+
 @inject IJSRuntime JSRuntime
 @inject HttpClient Http
 @inject NavigationManager NavigationManager
@@ -83,20 +83,24 @@
                             <div style="margin-top: 2em;">
                                 <MatTable Items="@Note.Attachments">
                                     <MatTableHeader>
-                                        <th>Name</th>
                                         <th></th>
+                                        <th>Name</th>
                                         <th>Uploader</th>
                                         <th></th>
                                     </MatTableHeader>
                                     <MatTableRow Context="attachment">
                                         <td>
-                                            @attachment.OriginalFileName
+                                            @if (new string[] { ".jpg", ".jpeg", ".png" }.Contains(System.IO.Path.GetExtension(attachment.OriginalFileName)))
+                                                {
+                                                <img src="/api/notes/@Note.NoteId/attachments/@attachment.ServerFileName" alt="Image preview" style="width: 124px; height: 124px;" />
+                                                }
+                                                else
+                                                {
+                                                <MatIcon Icon="@MatIconNames.Attachment"></MatIcon>
+                                                }
                                         </td>
                                         <td>
-                                            @if (new string[] { ".jpg", ".jpeg", ".png" }.Contains(Path.GetExtension(attachment.OriginalFileName)))
-                                                {
-                                                <img src="/api/notes/@Note.NoteId/attachments/@attachment.ServerFileName" style="width: 124px; height: 124px;" />
-                                                }
+                                            @attachment.OriginalFileName
                                         </td>
                                         <td>@attachment.UploadedBy</td>
                                         <td>
@@ -203,7 +207,7 @@
     {
         foreach (var file in files)
         {
-            using var stream = new MemoryStream();
+            using var stream = new System.IO.MemoryStream();
             await file.WriteToStreamAsync(stream);
 
             var newAttachment = new Attachment
