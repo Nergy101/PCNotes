@@ -14,8 +14,12 @@ namespace PCNotes.Services
 
         public MongoNoteService(IConfiguration config)
         {
-            var connectionstring = config["ConnectionStrings:Mongo"];
+            var connectionstring = Environment.GetEnvironmentVariable("MONGO");
+
             var client = new MongoClient(connectionstring);
+
+            Console.WriteLine(string.Join('-', client.ListDatabaseNames().ToList()));
+
             var database = client.GetDatabase("pcnotes");
             Notes = database.GetCollection<Note>("notes");
         }
